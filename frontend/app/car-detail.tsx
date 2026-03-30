@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
 import axios from 'axios';
+import Map from '../components/Map';
 
 const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 const { width } = Dimensions.get('window');
@@ -119,24 +119,12 @@ export default function CarDetail() {
             </View>
             <Text style={styles.locationAddress}>{car.location.address}</Text>
             
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                latitude: car.location.lat,
-                longitude: car.location.lng,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-            >
-              <Marker
-                coordinate={{
-                  latitude: car.location.lat,
-                  longitude: car.location.lng,
-                }}
-                title={car.name}
-                description={car.location.address}
-              />
-            </MapView>
+            <Map
+              latitude={car.location.lat}
+              longitude={car.location.lng}
+              title={car.name}
+              description={car.location.address}
+            />
           </View>
         </View>
       </ScrollView>
@@ -279,11 +267,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
     marginBottom: 16,
-  },
-  map: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
   },
   footer: {
     padding: 16,
