@@ -233,11 +233,11 @@ export default function Booking() {
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Price per day</Text>
-              <Text style={styles.summaryValue}>${pricePerDay}</Text>
+              <Text style={styles.summaryValue}>₹{pricePerDay}</Text>
             </View>
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>${calculateTotal()}</Text>
+              <Text style={styles.totalValue}>₹{calculateTotal()}</Text>
             </View>
           </View>
         </ScrollView>
@@ -249,7 +249,7 @@ export default function Booking() {
             disabled={loading}
           >
             <Text style={styles.bookButtonText}>
-              {loading ? 'Processing...' : `Book for $${calculateTotal()}`}
+              {loading ? 'Processing...' : `Book for ₹${calculateTotal()}`}
             </Text>
           </TouchableOpacity>
         </View>

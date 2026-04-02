@@ -191,10 +191,10 @@ export default function AddCar() {
               </View>
               <View style={styles.gap} />
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={styles.label}>Price/Day ($)</Text>
+                <Text style={styles.label}>Price/Day (₹)</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="50"
+                  placeholder="3000"
                   value={pricePerDay}
                   onChangeText={setPricePerDay}
                   keyboardType="decimal-pad"

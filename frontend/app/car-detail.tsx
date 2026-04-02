@@ -108,7 +108,7 @@ export default function CarDetail() {
 
           <View style={styles.priceCard}>
             <Text style={styles.priceLabel}>Price per day</Text>
-            <Text style={styles.price}>${car.pricePerDay}</Text>
+            <Text style={styles.price}>₹{car.pricePerDay}</Text>
           </View>
 
           <View style={styles.locationSection}>

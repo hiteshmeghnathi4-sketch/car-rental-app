@@ -106,7 +106,7 @@ export default function AdminPanel() {
         <Text style={styles.carDetails}>
           {item.year} {item.make} {item.model}
         </Text>
-        <Text style={styles.price}>${item.pricePerDay}/day</Text>
+        <Text style={styles.price}>₹{item.pricePerDay}/day</Text>
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.actionButton, item.availability ? styles.availableBtn : styles.unavailableBtn]}

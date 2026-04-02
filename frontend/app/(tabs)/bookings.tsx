@@ -138,7 +138,7 @@ export default function MyBookings() {
       <View style={styles.bookingFooter}>
         <View>
           <Text style={styles.priceLabel}>Total Price</Text>
-          <Text style={styles.price}>${item.totalPrice}</Text>
+          <Text style={styles.price}>₹{item.totalPrice}</Text>
         </View>
         <Text style={styles.bookingDate}>Booked: {formatDate(item.createdAt)}</Text>
       </View>

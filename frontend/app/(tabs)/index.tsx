@@ -75,7 +75,7 @@ export default function BrowseCars() {
           {item.year} {item.make} {item.model}
         </Text>
         <View style={styles.priceRow}>
-          <Text style={styles.price}>${item.pricePerDay}/day</Text>
+          <Text style={styles.price}>₹{item.pricePerDay}/day</Text>
           <View style={[styles.badge, item.availability ? styles.available : styles.unavailable]}>
             <Text style={styles.badgeText}>
               {item.availability ? 'Available' : 'Booked'}
