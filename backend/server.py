@@ -175,6 +175,85 @@ async def admin_logout(session: dict = Depends(verify_token), authorization: str
 async def verify_admin(session: dict = Depends(verify_token)):
     return {"email": session["email"], "authenticated": True}
 
+@api_router.get("/admin/stats")
+async def get_admin_stats(session: dict = Depends(verify_token)):
+    """Get dashboard stats for admin panel"""
+    try:
+        # Total cars
+        total_cars = await db.cars.count_documents({})
+        available_cars = await db.cars.count_documents({"availability": True})
+        booked_cars = total_cars - available_cars
+
+        # Total bookings
+        total_bookings = await db.bookings.count_documents({})
+        pending_bookings = await db.bookings.count_documents({"status": "pending"})
+        confirmed_bookings = await db.bookings.count_documents({"status": "confirmed"})
+
+        # Total revenue
+        pipeline_revenue = [
+            {"$group": {"_id": None, "totalRevenue": {"$sum": "$totalPrice"}}}
+        ]
+        revenue_result = await db.bookings.aggregate(pipeline_revenue).to_list(1)
+        total_revenue = revenue_result[0]["totalRevenue"] if revenue_result else 0
+
+        # Unique users
+        pipeline_users = [
+            {"$group": {"_id": "$userEmail"}},
+            {"$count": "total"}
+        ]
+        users_result = await db.bookings.aggregate(pipeline_users).to_list(1)
+        total_users = users_result[0]["total"] if users_result else 0
+
+        # Recent bookings (last 10)
+        recent_bookings_cursor = db.bookings.find().sort("createdAt", -1).limit(10)
+        recent_bookings = await recent_bookings_cursor.to_list(10)
+
+        # All users with their booking stats
+        pipeline_user_stats = [
+            {
+                "$group": {
+                    "_id": "$userEmail",
+                    "userName": {"$first": "$userName"},
+                    "userPhone": {"$first": "$userPhone"},
+                    "totalBookings": {"$sum": 1},
+                    "totalSpent": {"$sum": "$totalPrice"},
+                    "lastBooking": {"$max": "$createdAt"},
+                }
+            },
+            {"$sort": {"totalSpent": -1}}
+        ]
+        user_stats = await db.bookings.aggregate(pipeline_user_stats).to_list(100)
+
+        return {
+            "cars": {
+                "total": total_cars,
+                "available": available_cars,
+                "booked": booked_cars,
+            },
+            "bookings": {
+                "total": total_bookings,
+                "pending": pending_bookings,
+                "confirmed": confirmed_bookings,
+            },
+            "revenue": total_revenue,
+            "totalUsers": total_users,
+            "recentBookings": [booking_helper(b) for b in recent_bookings],
+            "userStats": [
+                {
+                    "email": u["_id"],
+                    "name": u["userName"],
+                    "phone": u.get("userPhone", ""),
+                    "totalBookings": u["totalBookings"],
+                    "totalSpent": u["totalSpent"],
+                    "lastBooking": u["lastBooking"],
+                }
+                for u in user_stats
+            ],
+        }
+    except Exception as e:
+        logging.error(f"Error fetching admin stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/admin/create")
 async def create_admin(admin: AdminCreate):
     """Create admin account - should be protected in production"""
