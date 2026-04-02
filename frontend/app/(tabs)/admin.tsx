@@ -10,9 +10,11 @@ import {
   RefreshControl,
   SafeAreaView,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -37,9 +39,89 @@ export default function AdminPanel() {
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 
-  const fetchCars = async () => {
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const savedToken = await AsyncStorage.getItem('adminToken');
+      if (savedToken) {
+        // Verify token is still valid
+        const response = await axios.get(`${EXPO_PUBLIC_BACKEND_URL}/api/admin/verify`, {
+          headers: { Authorization: `Bearer ${savedToken}` }
+        });
+        if (response.data.authenticated) {
+          setToken(savedToken);
+          setIsAuthenticated(true);
+          fetchCars(savedToken);
+        } else {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const response = await axios.post(`${EXPO_PUBLIC_BACKEND_URL}/api/admin/login`, {
+        email,
+        password
+      });
+      
+      const { token: newToken } = response.data;
+      await AsyncStorage.setItem('adminToken', newToken);
+      setToken(newToken);
+      setIsAuthenticated(true);
+      setLoading(true);
+      fetchCars(newToken);
+    } catch (error: any) {
+      Alert.alert('Login Failed', error.response?.data?.detail || 'Invalid credentials');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      if (token) {
+        await axios.post(`${EXPO_PUBLIC_BACKEND_URL}/api/admin/logout`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      await AsyncStorage.removeItem('adminToken');
+      setToken(null);
+      setIsAuthenticated(false);
+      setEmail('');
+      setPassword('');
+      setCars([]);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const fetchCars = async (authToken?: string) => {
+    const tokenToUse = authToken || token;
+    if (!tokenToUse) return;
+    
     try {
       const response = await axios.get(`${EXPO_PUBLIC_BACKEND_URL}/api/cars`);
       setCars(response.data);
@@ -52,8 +134,10 @@ export default function AdminPanel() {
   };
 
   useEffect(() => {
-    fetchCars();
-  }, []);
+    if (isAuthenticated && token) {
+      fetchCars();
+    }
+  }, [isAuthenticated]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -61,6 +145,8 @@ export default function AdminPanel() {
   };
 
   const handleDelete = (carId: string, carName: string) => {
+    if (!token) return;
+    
     Alert.alert(
       'Delete Car',
       `Are you sure you want to delete ${carName}?`,
@@ -71,7 +157,9 @@ export default function AdminPanel() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await axios.delete(`${EXPO_PUBLIC_BACKEND_URL}/api/cars/${carId}`);
+              await axios.delete(`${EXPO_PUBLIC_BACKEND_URL}/api/cars/${carId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
               Alert.alert('Success', 'Car deleted successfully');
               fetchCars();
             } catch (error) {
@@ -84,9 +172,13 @@ export default function AdminPanel() {
   };
 
   const toggleAvailability = async (carId: string, currentStatus: boolean) => {
+    if (!token) return;
+    
     try {
       await axios.put(`${EXPO_PUBLIC_BACKEND_URL}/api/cars/${carId}`, {
         availability: !currentStatus,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       fetchCars();
     } catch (error) {
@@ -140,6 +232,49 @@ export default function AdminPanel() {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loginContainer}>
+          <Ionicons name="shield-checkmark" size={64} color="#007AFF" />
+          <Text style={styles.loginTitle}>Admin Login</Text>
+          <Text style={styles.loginSubtitle}>Enter your credentials to access admin panel</Text>
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+          
+          <TouchableOpacity
+            style={[styles.loginButton, authLoading && styles.loginButtonDisabled]}
+            onPress={handleLogin}
+            disabled={authLoading}
+          >
+            <Text style={styles.loginButtonText}>
+              {authLoading ? 'Logging in...' : 'Login'}
+            </Text>
+          </TouchableOpacity>
+          
+          <Text style={styles.credentialsHint}>
+            Default: admin@carrental.com / admin123
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -147,6 +282,9 @@ export default function AdminPanel() {
           <Text style={styles.headerTitle}>Admin Panel</Text>
           <Text style={styles.headerSubtitle}>Manage your car inventory</Text>
         </View>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+        </TouchableOpacity>
       </View>
       <FlatList
         data={cars}
@@ -194,6 +332,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E5EA',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logoutButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
@@ -307,5 +451,57 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loginTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginTop: 16,
+  },
+  loginSubtitle: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 8,
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  input: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    marginBottom: 16,
+  },
+  loginButton: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  loginButtonDisabled: {
+    opacity: 0.5,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  credentialsHint: {
+    fontSize: 12,
+    color: '#8E8E93',
+    textAlign: 'center',
   },
 });

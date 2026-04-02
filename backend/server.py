@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -7,8 +7,10 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
+import hashlib
+import secrets
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -53,6 +55,40 @@ def booking_helper(booking) -> dict:
         "createdAt": booking["createdAt"]
     }
 
+# Admin authentication helpers
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed: str) -> bool:
+    return hash_password(password) == hashed
+
+# Store active sessions (in production, use Redis or similar)
+active_sessions = {}
+
+def create_session(admin_email: str) -> str:
+    token = secrets.token_urlsafe(32)
+    active_sessions[token] = {
+        "email": admin_email,
+        "expires": datetime.utcnow() + timedelta(days=7)
+    }
+    return token
+
+def verify_token(authorization: str = Header(None)) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = authorization.replace("Bearer ", "")
+    session = active_sessions.get(token)
+    
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    if session["expires"] < datetime.utcnow():
+        del active_sessions[token]
+        raise HTTPException(status_code=401, detail="Session expired")
+    
+    return session
+
 # Models
 class Location(BaseModel):
     address: str
@@ -91,10 +127,76 @@ class Booking(BaseModel):
     status: str = "pending"
     createdAt: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
+class AdminLogin(BaseModel):
+    email: str
+    password: str
+
+class AdminCreate(BaseModel):
+    email: str
+    password: str
+    name: str
+
 # Car Routes
 @api_router.get("/")
 async def root():
     return {"message": "Car Rental API"}
+
+# Admin Routes
+@api_router.post("/admin/login")
+async def admin_login(credentials: AdminLogin):
+    try:
+        admin = await db.admins.find_one({"email": credentials.email})
+        if not admin:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        if not verify_password(credentials.password, admin["password"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        token = create_session(credentials.email)
+        return {
+            "token": token,
+            "email": admin["email"],
+            "name": admin.get("name", "")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error during login: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/admin/logout")
+async def admin_logout(session: dict = Depends(verify_token), authorization: str = Header(None)):
+    token = authorization.replace("Bearer ", "")
+    if token in active_sessions:
+        del active_sessions[token]
+    return {"message": "Logged out successfully"}
+
+@api_router.get("/admin/verify")
+async def verify_admin(session: dict = Depends(verify_token)):
+    return {"email": session["email"], "authenticated": True}
+
+@api_router.post("/admin/create")
+async def create_admin(admin: AdminCreate):
+    """Create admin account - should be protected in production"""
+    try:
+        existing = await db.admins.find_one({"email": admin.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Admin already exists")
+        
+        admin_doc = {
+            "email": admin.email,
+            "password": hash_password(admin.password),
+            "name": admin.name,
+            "createdAt": datetime.utcnow().isoformat()
+        }
+        
+        await db.admins.insert_one(admin_doc)
+        return {"message": "Admin created successfully", "email": admin.email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error creating admin: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/cars")
 async def get_cars():
@@ -117,7 +219,7 @@ async def get_car(car_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/cars")
-async def create_car(car: Car):
+async def create_car(car: Car, session: dict = Depends(verify_token)):
     try:
         car_dict = car.dict()
         result = await db.cars.insert_one(car_dict)
@@ -128,7 +230,7 @@ async def create_car(car: Car):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.put("/cars/{car_id}")
-async def update_car(car_id: str, car: CarUpdate):
+async def update_car(car_id: str, car: CarUpdate, session: dict = Depends(verify_token)):
     try:
         update_data = {k: v for k, v in car.dict().items() if v is not None}
         if not update_data:
@@ -149,7 +251,7 @@ async def update_car(car_id: str, car: CarUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.delete("/cars/{car_id}")
-async def delete_car(car_id: str):
+async def delete_car(car_id: str, session: dict = Depends(verify_token)):
     try:
         result = await db.cars.delete_one({"_id": ObjectId(car_id)})
         if result.deleted_count == 0:
