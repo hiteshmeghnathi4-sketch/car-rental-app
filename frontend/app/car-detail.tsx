@@ -117,24 +117,6 @@ export default function CarDetail() {
               <Text style={styles.locationTitle}>Pickup Location</Text>
             </View>
             <Text style={styles.locationAddress}>{car.location.address}</Text>
-            
-            <View style={styles.mapPlaceholder}>
-              <Ionicons name="map" size={48} color="#C7C7CC" />
-              <Text style={styles.coordinates}>
-                {car.location.lat.toFixed(4)}, {car.location.lng.toFixed(4)}
-              </Text>
-              <TouchableOpacity 
-                style={styles.openMapsButton}
-                onPress={() => {
-                  // Open in device maps app
-                  const url = `https://www.google.com/maps?q=${car.location.lat},${car.location.lng}`;
-                  console.log('Opening maps:', url);
-                }}
-              >
-                <Ionicons name="navigate" size={16} color="#007AFF" />
-                <Text style={styles.openMapsText}>Open in Maps</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </ScrollView>
@@ -277,39 +259,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
     marginBottom: 16,
-  },
-  mapPlaceholder: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  coordinates: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-    marginTop: 12,
-  },
-  openMapsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  openMapsText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
   },
   footer: {
     padding: 16,

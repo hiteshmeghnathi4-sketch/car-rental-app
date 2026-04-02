@@ -27,8 +27,6 @@ export default function AddCar() {
   const [year, setYear] = useState('');
   const [pricePerDay, setPricePerDay] = useState('');
   const [address, setAddress] = useState('');
-  const [lat, setLat] = useState('');
-  const [lng, setLng] = useState('');
   const [image, setImage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -54,15 +52,13 @@ export default function AddCar() {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || !make.trim() || !model.trim() || !year.trim() || !pricePerDay.trim() || !address.trim() || !lat.trim() || !lng.trim() || !image) {
+    if (!name.trim() || !make.trim() || !model.trim() || !year.trim() || !pricePerDay.trim() || !address.trim() || !image) {
       Alert.alert('Error', 'Please fill in all fields and select an image');
       return;
     }
 
     const yearNum = parseInt(year);
     const priceNum = parseFloat(pricePerDay);
-    const latNum = parseFloat(lat);
-    const lngNum = parseFloat(lng);
 
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > new Date().getFullYear() + 1) {
       Alert.alert('Error', 'Please enter a valid year');
@@ -71,11 +67,6 @@ export default function AddCar() {
 
     if (isNaN(priceNum) || priceNum <= 0) {
       Alert.alert('Error', 'Please enter a valid price');
-      return;
-    }
-
-    if (isNaN(latNum) || isNaN(lngNum)) {
-      Alert.alert('Error', 'Please enter valid coordinates');
       return;
     }
 
@@ -91,8 +82,8 @@ export default function AddCar() {
         availability: true,
         location: {
           address,
-          lat: latNum,
-          lng: lngNum,
+          lat: 0,
+          lng: 0,
         },
       });
 
@@ -210,37 +201,13 @@ export default function AddCar() {
               <Text style={styles.label}>Address</Text>
               <TextInput
                 style={styles.input}
-                placeholder="123 Main St, City, State"
+                placeholder="123 Main St, City, State, Country"
                 value={address}
                 onChangeText={setAddress}
                 multiline
+                numberOfLines={2}
               />
             </View>
-
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={styles.label}>Latitude</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="37.7749"
-                  value={lat}
-                  onChangeText={setLat}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-              <View style={styles.gap} />
-              <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={styles.label}>Longitude</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="-122.4194"
-                  value={lng}
-                  onChangeText={setLng}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-            </View>
-            <Text style={styles.hint}>Tip: Use Google Maps to find coordinates</Text>
           </View>
         </ScrollView>
 
