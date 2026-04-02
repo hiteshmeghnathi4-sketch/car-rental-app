@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime, timedelta
 from bson import ObjectId
+from urllib.parse import quote_plus, urlparse
 import hashlib
 import secrets
 
@@ -20,6 +21,20 @@ mongo_url = os.environ.get('MONGO_URL', '')
 if not mongo_url:
     logging.error("MONGO_URL environment variable is not set!")
     raise Exception("MONGO_URL environment variable is required")
+
+# Auto-encode username/password if they contain special characters
+try:
+    if '@' in mongo_url and '://' in mongo_url:
+        scheme_end = mongo_url.index('://') + 3
+        at_index = mongo_url.rindex('@')
+        userinfo = mongo_url[scheme_end:at_index]
+        if ':' in userinfo:
+            username, password = userinfo.split(':', 1)
+            encoded_username = quote_plus(username)
+            encoded_password = quote_plus(password)
+            mongo_url = mongo_url[:scheme_end] + encoded_username + ':' + encoded_password + mongo_url[at_index:]
+except Exception as e:
+    logging.warning(f"Could not auto-encode MongoDB URI: {e}")
 
 db_name = os.environ.get('DB_NAME', 'car_rental_db')
 client = AsyncIOMotorClient(mongo_url)
