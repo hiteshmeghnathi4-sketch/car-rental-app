@@ -43,6 +43,11 @@ db = client[db_name]
 # Create the main app without a prefix
 app = FastAPI()
 
+# Root endpoint
+@app.get("/")
+async def home():
+    return {"message": "Car Rental API is running!", "docs": "/docs", "api": "/api/"}
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
