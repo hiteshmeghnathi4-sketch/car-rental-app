@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -72,6 +73,14 @@ export default function AddCar() {
 
     setLoading(true);
     try {
+      // Get admin token
+      const token = await AsyncStorage.getItem('adminToken');
+      if (!token) {
+        Alert.alert('Error', 'You must be logged in as admin to add cars');
+        router.back();
+        return;
+      }
+
       await axios.post(`${EXPO_PUBLIC_BACKEND_URL}/api/cars`, {
         name,
         make,
@@ -85,6 +94,8 @@ export default function AddCar() {
           lat: 0,
           lng: 0,
         },
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       Alert.alert(
