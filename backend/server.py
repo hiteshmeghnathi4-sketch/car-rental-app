@@ -12,6 +12,7 @@ from bson import ObjectId
 from urllib.parse import quote_plus, urlparse
 import hashlib
 import secrets
+import certifi
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -37,7 +38,7 @@ except Exception as e:
     logging.warning(f"Could not auto-encode MongoDB URI: {e}")
 
 db_name = os.environ.get('DB_NAME', 'car_rental_db')
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
 db = client[db_name]
 
 # Create the main app without a prefix
@@ -453,3 +454,17 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+@app.on_event("startup")
+async def seed_admin():
+    """Auto-create default admin if none exists"""
+    try:
+        existing = await db.admins.find_one({"email": "admin@carrental.com"})
+        if not existing:
+            hashed = hashlib.sha256("admin123".encode()).hexdigest()
+            await db.admins.insert_one({"email": "admin@carrental.com", "password": hashed})
+            logging.info("Default admin account created: admin@carrental.com")
+        else:
+            logging.info("Admin account already exists")
+    except Exception as e:
+        logging.error(f"Error seeding admin: {e}")
